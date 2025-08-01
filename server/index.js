@@ -1,55 +1,96 @@
 const express = require('express');
 const cors = require('cors');
 const { pool, testConnection } = require('./db');
+const os = require('os');
 
 const app = express();
-const port = 3001; // Puerto para el backend
+const port = process.env.PORT || 3001;
 
-// Configuración de CORS para permitir todas las URLs de Vite
-app.use(cors({
-    origin: [
-        'http://localhost:5173',
-        'http://192.168.1.234:5173',
-        'http://172.19.0.1:5173',
-        'http://172.22.0.1:5173',
-        'http://172.18.0.1:5173',
-        'http://172.20.0.1:5173',
-        'http://172.17.0.1:5173'
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
-}));
+// Obtener la IP local del servidor
+const getLocalIP = () => {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            // Omitir direcciones IPv6 y direcciones de loopback
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return 'localhost';
+};
+
+const serverIP = getLocalIP();
+
+// Configuración de CORS para permitir cualquier origen en desarrollo
+app.use(cors());
+
+// Middleware para logging
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
 app.use(express.json());
 
 // Ruta para probar la conexión
 app.post('/api/connections/test-sql', async (req, res) => {
-    console.log('[SQL Test] Inicio de la solicitud');
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Iniciando prueba de conexión SQL`);
+    
     try {
+        // Verificar la configuración recibida
+        const config = req.body;
+        console.log('[SQL Test] Configuración recibida:', {
+            host: config?.host || pool.options.host,
+            database: config?.database || pool.options.database,
+            user: config?.user || pool.options.user,
+            port: config?.port || pool.options.port
+        });
+
         console.log('[SQL Test] Intentando conexión a la base de datos...');
         const result = await testConnection();
-        console.log('[SQL Test] Conexión exitosa:', result);
         
-        const response = { 
-            success: true, 
+        const response = {
+            success: true,
             message: 'Conexión exitosa a PostgreSQL',
-            details: result 
+            details: {
+                timestamp: result.timestamp,
+                server: {
+                    ip: serverIP,
+                    port: port
+                },
+                database: {
+                    host: pool.options.host,
+                    database: pool.options.database,
+                    user: pool.options.user,
+                    port: pool.options.port
+                }
+            }
         };
-        console.log('[SQL Test] Enviando respuesta:', response);
         
+        console.log(`[${timestamp}] Conexión exitosa:`, response);
         return res.json(response);
     } catch (error) {
-        console.error('[SQL Test] Error en la conexión:', {
+        console.error(`[${timestamp}] Error en la conexión:`, {
             name: error.name,
             message: error.message,
+            code: error.code,
             stack: error.stack
         });
         
-        const errorResponse = { 
-            success: false, 
+        const errorResponse = {
+            success: false,
             message: error.message,
-            details: error.toString()
+            details: {
+                code: error.code,
+                timestamp: timestamp,
+                server: {
+                    ip: serverIP,
+                    port: port
+                },
+                originalError: error.toString()
+            }
         };
-        console.log('[SQL Test] Enviando respuesta de error:', errorResponse);
         
         return res.status(500).json(errorResponse);
     }
@@ -66,5 +107,12 @@ app.get('/api/initial-data', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Servidor backend corriendo en http://localhost:${port}`);
+    console.log('='.repeat(50));
+    console.log(`Servidor Backend iniciado`);
+    console.log(`- Hora de inicio: ${new Date().toISOString()}`);
+    console.log(`- IP Local: http://${serverIP}:${port}`);
+    console.log(`- Localhost: http://localhost:${port}`);
+    console.log(`- Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`- PostgreSQL: ${pool.options.user}@${pool.options.host}:${pool.options.port}/${pool.options.database}`);
+    console.log('='.repeat(50));
 });
