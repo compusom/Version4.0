@@ -76,7 +76,12 @@ export const ConnectionsView: React.FC<ConnectionsViewProps> = ({ metaApiConfig,
     // Test a connection by sending credentials to the backend
     const testConnection = async (type: 'sql' | 'ftp' | 'meta' | 'gemini', config?: any) => {
         try {
-            const response = await fetch(`/api/connections/test-${type}`, {
+            console.log('Intentando conexión con:', {type, config});
+            const baseUrl = window.location.hostname === 'localhost' 
+                ? 'http://localhost:3001' 
+                : `http://${window.location.hostname}:3001`;
+            
+            const response = await fetch(`${baseUrl}/api/connections/test-${type}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: config ? JSON.stringify(config) : undefined
