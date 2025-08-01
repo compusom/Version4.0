@@ -1,305 +1,55 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { 
-    pool, testConnection, checkAndCreateTables, saveClients, savePerformanceData, saveLookerData,
-    getClients, getPerformanceDataByClient, getClientMetrics, getTopCampaignsByClient, getLookerDataByClient
-} = require('./db');
-const os = require('os');
+const { Pool } = require('pg');
+
+const pool = new Pool({
+    user: process.env.POSTGRES_USER,
+    host: process.env.POSTGRES_HOST,
+    database: process.env.POSTGRES_DB,
+    password: process.env.POSTGRES_PASSWORD,
+    port: parseInt(process.env.POSTGRES_PORT || '5432'),
+});
 
 const app = express();
-const port = process.env.PORT || 3001;
-
-// Obtener la IP local del servidor
-const getLocalIP = () => {
-    const interfaces = os.networkInterfaces();
-    for (const name of Object.keys(interfaces)) {
-        for (const iface of interfaces[name]) {
-            // Omitir direcciones IPv6 y direcciones de loopback
-            if (iface.family === 'IPv4' && !iface.internal) {
-                return iface.address;
-            }
-        }
-    }
-    return 'localhost';
-};
-
-const serverIP = getLocalIP();
-
-// Configuración de CORS para permitir cualquier origen en desarrollo
 app.use(cors());
-
-// Middleware para logging
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    next();
-});
 app.use(express.json());
 
-// Ruta para probar la conexión
+// Test SQL connection endpoint
 app.post('/api/connections/test-sql', async (req, res) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] Iniciando prueba de conexión SQL`);
-    
     try {
-        // Verificar la configuración recibida
-        const config = req.body;
-        console.log('[SQL Test] Configuración recibida:', {
-            host: config?.host || pool.options.host,
-            database: config?.database || pool.options.database,
-            user: config?.user || pool.options.user,
-            port: config?.port || pool.options.port
-        });
-
-        console.log('[SQL Test] Intentando conexión a la base de datos...');
-        const result = await testConnection();
-        
-        const response = {
-            success: true,
-            message: 'Conexión exitosa a PostgreSQL',
-            details: {
-                timestamp: result.timestamp,
-                server: {
-                    ip: serverIP,
-                    port: port
-                },
-                database: {
-                    host: pool.options.host,
-                    database: pool.options.database,
-                    user: pool.options.user,
-                    port: pool.options.port
-                }
-            }
-        };
-        
-        console.log(`[${timestamp}] Conexión exitosa:`, response);
-        return res.json(response);
-    } catch (error) {
-        console.error(`[${timestamp}] Error en la conexión:`, {
-            name: error.name,
-            message: error.message,
-            code: error.code,
-            stack: error.stack
-        });
-        
-        const errorResponse = {
-            success: false,
-            message: error.message,
-            details: {
-                code: error.code,
-                timestamp: timestamp,
-                server: {
-                    ip: serverIP,
-                    port: port
-                },
-                originalError: error.toString()
-            }
-        };
-        
-        return res.status(500).json(errorResponse);
+        const client = await pool.connect();
+        const result = await client.query('SELECT NOW()');
+        client.release();
+        res.json({ success: true, message: 'Conexión exitosa a PostgreSQL', timestamp: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Error al conectar a PostgreSQL', error: err.message });
     }
 });
 
-// Endpoint para revisar y crear tablas principales
-app.post('/api/db/status', async (req, res) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] Revisión/creación de tablas principales iniciada`);
+// Check and create tables endpoint
+app.post('/api/connections/check-tables', async (req, res) => {
+    const tables = [
+        'users', 'clients', 'performance_records', 'looker_data', 'import_history', 'logs', 'reports'
+    ];
     try {
-        const results = await checkAndCreateTables();
-        console.log(`[${timestamp}] Estado de tablas:`, results);
-        return res.json({
-            success: true,
-            tables: results,
-            timestamp
-        });
-    } catch (error) {
-        console.error(`[${timestamp}] Error al revisar/crear tablas:`, error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-            timestamp
-        });
-    }
-});
-
-// Endpoint para guardar clientes
-app.post('/api/clients', async (req, res) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] Guardando clientes`);
-    try {
-        await saveClients(req.body);
-        return res.status(204).send();
-    } catch (error) {
-        console.error(`[${timestamp}] Error al guardar clientes:`, error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-            timestamp
-        });
-    }
-});
-
-// Endpoint para guardar datos de rendimiento
-app.post('/api/performance-data', async (req, res) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] Guardando datos de rendimiento`);
-    try {
-        await savePerformanceData(req.body);
-        return res.status(204).send();
-    } catch (error) {
-        console.error(`[${timestamp}] Error al guardar datos de rendimiento:`, error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-            timestamp
-        });
-    }
-});
-
-// Endpoint para guardar datos de Looker
-app.post('/api/looker-data', async (req, res) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] Guardando datos de Looker`);
-    try {
-        await saveLookerData(req.body);
-        return res.status(204).send();
-    } catch (error) {
-        console.error(`[${timestamp}] Error al guardar datos de Looker:`, error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-            timestamp
-        });
-    }
-});
-
-// Endpoint para obtener clientes
-app.get('/api/clients', async (req, res) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] Obteniendo clientes`);
-    try {
-        const clients = await getClients();
-        return res.json(clients);
-    } catch (error) {
-        console.error(`[${timestamp}] Error al obtener clientes:`, error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-            timestamp
-        });
-    }
-});
-
-// Endpoint para obtener datos de rendimiento por cliente
-app.get('/api/performance-data', async (req, res) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] Obteniendo datos de rendimiento`);
-    try {
-        const clients = await getClients();
-        const performanceData = {};
-        
-        for (const client of clients) {
-            const clientData = await getPerformanceDataByClient(client.id);
-            performanceData[client.id] = clientData;
+        const client = await pool.connect();
+        const results = [];
+        for (const table of tables) {
+            const result = await client.query(
+                `SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1) AS "exists"`,
+                [table]
+            );
+            results.push({ table, exists: result.rows[0].exists });
         }
-        
-        return res.json(performanceData);
-    } catch (error) {
-        console.error(`[${timestamp}] Error al obtener datos de rendimiento:`, error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-            timestamp
-        });
+        client.release();
+        res.json({ success: true, tables: results });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Error al verificar tablas', error: err.message });
     }
 });
 
-// Endpoint para obtener métricas específicas por cliente
-app.get('/api/clients/:clientId/metrics', async (req, res) => {
-    const timestamp = new Date().toISOString();
-    const { clientId } = req.params;
-    const { startDate, endDate } = req.query;
-    console.log(`[${timestamp}] Obteniendo métricas para cliente ${clientId}`);
-    try {
-        const metrics = await getClientMetrics(clientId, startDate, endDate);
-        return res.json(metrics);
-    } catch (error) {
-        console.error(`[${timestamp}] Error al obtener métricas del cliente:`, error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-            timestamp
-        });
-    }
-});
-
-// Endpoint para obtener top campañas por cliente
-app.get('/api/clients/:clientId/top-campaigns', async (req, res) => {
-    const timestamp = new Date().toISOString();
-    const { clientId } = req.params;
-    const { limit = 10 } = req.query;
-    console.log(`[${timestamp}] Obteniendo top campañas para cliente ${clientId}`);
-    try {
-        const campaigns = await getTopCampaignsByClient(clientId, parseInt(limit));
-        return res.json(campaigns);
-    } catch (error) {
-        console.error(`[${timestamp}] Error al obtener top campañas:`, error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-            timestamp
-        });
-    }
-});
-
-// Endpoint para obtener datos de Looker
-app.get('/api/looker-data', async (req, res) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] Obteniendo datos de Looker`);
-    try {
-        const clients = await getClients();
-        const lookerData = {};
-        
-        for (const client of clients) {
-            const clientLookerData = await getLookerDataByClient(client.id);
-            lookerData[client.id] = {};
-            
-            clientLookerData.forEach(row => {
-                lookerData[client.id][row.ad_name] = {
-                    imageUrl: row.image_url,
-                    adPreviewLink: row.ad_preview_link
-                };
-            });
-        }
-        
-        return res.json(lookerData);
-    } catch (error) {
-        console.error(`[${timestamp}] Error al obtener datos de Looker:`, error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-            timestamp
-        });
-    }
-});
-
-// Ruta inicial
-app.get('/api/initial-data', async (req, res) => {
-    try {
-        // Aquí puedes agregar la lógica para obtener datos iniciales
-        res.json({ message: 'Servidor funcionando correctamente' });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.listen(port, () => {
-    console.log('='.repeat(50));
-    console.log(`Servidor Backend iniciado`);
-    console.log(`- Hora de inicio: ${new Date().toISOString()}`);
-    console.log(`- IP Local: http://${serverIP}:${port}`);
-    console.log(`- Localhost: http://localhost:${port}`);
-    console.log(`- Ambiente: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`- PostgreSQL: ${pool.options.user}@${pool.options.host}:${pool.options.port}/${pool.options.database}`);
-    console.log('='.repeat(50));
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+    console.log(`Backend running on port ${PORT}`);
 });
