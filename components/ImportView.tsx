@@ -108,6 +108,9 @@ export const ImportView: React.FC<ImportViewProps> = ({ clients, setClients, loo
             return;
         }
 
+        // Guardar datos de rendimiento en la base de datos SQL
+        await dbTyped.savePerformanceData(performanceData);
+
         // Aggregate feedback from all results
         const clientNames = results.map(r => r.client.name).join(', ');
         const periodStarts = results.map(r => r.periodStart).filter(Boolean);
@@ -168,6 +171,9 @@ export const ImportView: React.FC<ImportViewProps> = ({ clients, setClients, loo
             return;
         }
     
+        // Guardar datos de Looker en la base de datos SQL
+        await dbTyped.saveLookerData(lookerData);
+
         const clientNames = results.map(r => r.client.name).join(', ');
         setFeedback({ type: 'success', message: `Importación de Looker completada. ${totalNewRecords} nuevos creativos vinculados para: ${clientNames}.` });
     
@@ -208,18 +214,36 @@ export const ImportView: React.FC<ImportViewProps> = ({ clients, setClients, loo
             if (source === 'looker') {
                 const checkResult = await processLookerData(file, clients, lookerData, true);
                 if ('newAccountNames' in checkResult && checkResult.newAccountNames.length > 0) {
-                    setNewAccountNames(checkResult.newAccountNames);
-                    setPendingXlsxFile({ file, source });
-                    setIsNewClientsModalOpen(true);
+                    // Crear automáticamente los nuevos clientes
+                    const newClients = checkResult.newAccountNames.map(name => ({
+                        id: crypto.randomUUID(),
+                        name,
+                        logo: '',
+                        currency: 'EUR',
+                        metaAccountName: name
+                    }));
+                    const updatedClients = [...clients, ...newClients];
+                    setClients(updatedClients);
+                    await dbTyped.saveClients(updatedClients);
+                    await processAndSaveLookerData(file, updatedClients);
                 } else {
                     await processAndSaveLookerData(file, clients);
                 }
             } else {
                 const checkResult = await processPerformanceData(file, clients, performanceData, source, true);
                 if ('newAccountNames' in checkResult && checkResult.newAccountNames.length > 0) {
-                    setNewAccountNames(checkResult.newAccountNames);
-                    setPendingXlsxFile({ file, source });
-                    setIsNewClientsModalOpen(true);
+                    // Crear automáticamente los nuevos clientes
+                    const newClients = checkResult.newAccountNames.map(name => ({
+                        id: crypto.randomUUID(),
+                        name,
+                        logo: '',
+                        currency: 'EUR',
+                        metaAccountName: name
+                    }));
+                    const updatedClients = [...clients, ...newClients];
+                    setClients(updatedClients);
+                    await dbTyped.saveClients(updatedClients);
+                    await processAndSaveFullData(file, source, updatedClients);
                 } else {
                     await processAndSaveFullData(file, source, clients);
                 }

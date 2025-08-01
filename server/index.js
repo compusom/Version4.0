@@ -1,27 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { pool, testConnection, checkAndCreateTables } = require('./db');
-// Endpoint para revisar y crear tablas principales
-app.post('/api/db/status', async (req, res) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] Revisión/creación de tablas principales iniciada`);
-    try {
-        const results = await checkAndCreateTables();
-        console.log(`[${timestamp}] Estado de tablas:`, results);
-        return res.json({
-            success: true,
-            tables: results,
-            timestamp
-        });
-    } catch (error) {
-        console.error(`[${timestamp}] Error al revisar/crear tablas:`, error);
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-            timestamp
-        });
-    }
-});
+const { pool, testConnection, checkAndCreateTables, saveClients, savePerformanceData, saveLookerData } = require('./db');
 const os = require('os');
 
 const app = express();
@@ -114,6 +93,79 @@ app.post('/api/connections/test-sql', async (req, res) => {
         };
         
         return res.status(500).json(errorResponse);
+    }
+});
+
+// Endpoint para revisar y crear tablas principales
+app.post('/api/db/status', async (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Revisión/creación de tablas principales iniciada`);
+    try {
+        const results = await checkAndCreateTables();
+        console.log(`[${timestamp}] Estado de tablas:`, results);
+        return res.json({
+            success: true,
+            tables: results,
+            timestamp
+        });
+    } catch (error) {
+        console.error(`[${timestamp}] Error al revisar/crear tablas:`, error);
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+            timestamp
+        });
+    }
+});
+
+// Endpoint para guardar clientes
+app.post('/api/clients', async (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Guardando clientes`);
+    try {
+        await saveClients(req.body);
+        return res.status(204).send();
+    } catch (error) {
+        console.error(`[${timestamp}] Error al guardar clientes:`, error);
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+            timestamp
+        });
+    }
+});
+
+// Endpoint para guardar datos de rendimiento
+app.post('/api/performance-data', async (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Guardando datos de rendimiento`);
+    try {
+        await savePerformanceData(req.body);
+        return res.status(204).send();
+    } catch (error) {
+        console.error(`[${timestamp}] Error al guardar datos de rendimiento:`, error);
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+            timestamp
+        });
+    }
+});
+
+// Endpoint para guardar datos de Looker
+app.post('/api/looker-data', async (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Guardando datos de Looker`);
+    try {
+        await saveLookerData(req.body);
+        return res.status(204).send();
+    } catch (error) {
+        console.error(`[${timestamp}] Error al guardar datos de Looker:`, error);
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+            timestamp
+        });
     }
 });
 
