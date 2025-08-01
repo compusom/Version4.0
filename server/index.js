@@ -26,6 +26,7 @@ app.post('/api/connections/test-and-save', async (req, res) => {
         }
         res.json({ success: true, message: 'Conexión exitosa a PostgreSQL', saved: !!save });
     } catch (err) {
+        console.error('Error al conectar a PostgreSQL (test-and-save):', err);
         res.status(500).json({ success: false, message: 'Error al conectar a PostgreSQL', error: err.message });
     }
 });
@@ -46,6 +47,7 @@ app.post('/api/connections/test-sql', async (req, res) => {
         client.release();
         res.json({ success: true, message: 'Conexión exitosa a PostgreSQL', timestamp: result.rows[0] });
     } catch (err) {
+        console.error('Error al conectar a PostgreSQL (test-sql):', err);
         res.status(500).json({ success: false, message: 'Error al conectar a PostgreSQL', error: err.message });
     }
 });
@@ -68,6 +70,7 @@ app.post('/api/connections/check-tables', async (req, res) => {
         client.release();
         res.json({ success: true, tables: results });
     } catch (err) {
+        console.error('Error al verificar tablas en PostgreSQL:', err);
         res.status(500).json({ success: false, message: 'Error al verificar tablas', error: err.message });
     }
 });
