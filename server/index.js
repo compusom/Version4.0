@@ -1,6 +1,9 @@
 const express = require('express');
 const cors = require('cors');
-const { pool, testConnection, checkAndCreateTables, saveClients, savePerformanceData, saveLookerData } = require('./db');
+const { 
+    pool, testConnection, checkAndCreateTables, saveClients, savePerformanceData, saveLookerData,
+    getClients, getPerformanceDataByClient, getClientMetrics, getTopCampaignsByClient, getLookerDataByClient
+} = require('./db');
 const os = require('os');
 
 const app = express();
@@ -161,6 +164,116 @@ app.post('/api/looker-data', async (req, res) => {
         return res.status(204).send();
     } catch (error) {
         console.error(`[${timestamp}] Error al guardar datos de Looker:`, error);
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+            timestamp
+        });
+    }
+});
+
+// Endpoint para obtener clientes
+app.get('/api/clients', async (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Obteniendo clientes`);
+    try {
+        const clients = await getClients();
+        return res.json(clients);
+    } catch (error) {
+        console.error(`[${timestamp}] Error al obtener clientes:`, error);
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+            timestamp
+        });
+    }
+});
+
+// Endpoint para obtener datos de rendimiento por cliente
+app.get('/api/performance-data', async (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Obteniendo datos de rendimiento`);
+    try {
+        const clients = await getClients();
+        const performanceData = {};
+        
+        for (const client of clients) {
+            const clientData = await getPerformanceDataByClient(client.id);
+            performanceData[client.id] = clientData;
+        }
+        
+        return res.json(performanceData);
+    } catch (error) {
+        console.error(`[${timestamp}] Error al obtener datos de rendimiento:`, error);
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+            timestamp
+        });
+    }
+});
+
+// Endpoint para obtener métricas específicas por cliente
+app.get('/api/clients/:clientId/metrics', async (req, res) => {
+    const timestamp = new Date().toISOString();
+    const { clientId } = req.params;
+    const { startDate, endDate } = req.query;
+    console.log(`[${timestamp}] Obteniendo métricas para cliente ${clientId}`);
+    try {
+        const metrics = await getClientMetrics(clientId, startDate, endDate);
+        return res.json(metrics);
+    } catch (error) {
+        console.error(`[${timestamp}] Error al obtener métricas del cliente:`, error);
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+            timestamp
+        });
+    }
+});
+
+// Endpoint para obtener top campañas por cliente
+app.get('/api/clients/:clientId/top-campaigns', async (req, res) => {
+    const timestamp = new Date().toISOString();
+    const { clientId } = req.params;
+    const { limit = 10 } = req.query;
+    console.log(`[${timestamp}] Obteniendo top campañas para cliente ${clientId}`);
+    try {
+        const campaigns = await getTopCampaignsByClient(clientId, parseInt(limit));
+        return res.json(campaigns);
+    } catch (error) {
+        console.error(`[${timestamp}] Error al obtener top campañas:`, error);
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+            timestamp
+        });
+    }
+});
+
+// Endpoint para obtener datos de Looker
+app.get('/api/looker-data', async (req, res) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Obteniendo datos de Looker`);
+    try {
+        const clients = await getClients();
+        const lookerData = {};
+        
+        for (const client of clients) {
+            const clientLookerData = await getLookerDataByClient(client.id);
+            lookerData[client.id] = {};
+            
+            clientLookerData.forEach(row => {
+                lookerData[client.id][row.ad_name] = {
+                    imageUrl: row.image_url,
+                    adPreviewLink: row.ad_preview_link
+                };
+            });
+        }
+        
+        return res.json(lookerData);
+    } catch (error) {
+        console.error(`[${timestamp}] Error al obtener datos de Looker:`, error);
         return res.status(500).json({
             success: false,
             message: error.message,
