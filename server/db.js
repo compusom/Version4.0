@@ -54,7 +54,82 @@ async function testConnection() {
     }
 }
 
+// Función para revisar y crear tablas principales
+async function checkAndCreateTables() {
+    const tables = [
+        {
+            name: 'users',
+            createSQL: `CREATE TABLE users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(100) NOT NULL,
+                password VARCHAR(100) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`
+        },
+        {
+            name: 'clients',
+            createSQL: `CREATE TABLE clients (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                email VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`
+        },
+        {
+            name: 'logs',
+            createSQL: `CREATE TABLE logs (
+                id SERIAL PRIMARY KEY,
+                message TEXT NOT NULL,
+                level VARCHAR(20),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`
+        },
+        {
+            name: 'reports',
+            createSQL: `CREATE TABLE reports (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR(200) NOT NULL,
+                content TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`
+        }
+    ];
+
+    const client = await pool.connect();
+    const results = [];
+    try {
+        for (const table of tables) {
+            let exists = false;
+            let error = null;
+            try {
+                const res = await client.query(
+                    `SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_schema = 'public' AND table_name = $1
+                    ) AS "exists"`, [table.name]
+                );
+                exists = res.rows[0].exists;
+                if (!exists) {
+                    await client.query(table.createSQL);
+                }
+            } catch (err) {
+                error = err.message;
+            }
+            results.push({
+                table: table.name,
+                exists: exists || false,
+                created: !exists && !error,
+                error: error
+            });
+        }
+    } finally {
+        client.release();
+    }
+    return results;
+}
+
 module.exports = {
     pool,
-    testConnection
+    testConnection,
+    checkAndCreateTables
 };
