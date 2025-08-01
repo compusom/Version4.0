@@ -110,6 +110,10 @@ export const dbTyped = {
     // --- Control Panel ---
     // Backend: POST /api/control/clear-all-data -> no devuelve nada (204)
     clearAllData: () => api.post<void>('/control/clear-all-data', {}),
+
+    // --- SQL Tables Status ---
+    // Backend: POST /api/db/status -> devuelve estado de tablas principales
+    getSqlTablesStatus: () => api.post<{ success: boolean; tables: Array<{ table: string; exists: boolean; created: boolean; error: string | null }>; timestamp: string }>('/db/status', {}),
 };
 
 export const dbConnectionStatus = {
