@@ -1,4 +1,11 @@
 const fs = require('fs');
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const { Pool } = require('pg');
+const app = express();
+app.use(cors());
+app.use(express.json());
 // Test SQL connection with custom credentials and optionally save them
 app.post('/api/connections/test-and-save', async (req, res) => {
     const { host, database, user, password, port, save } = req.body;
@@ -22,11 +29,6 @@ app.post('/api/connections/test-and-save', async (req, res) => {
         res.status(500).json({ success: false, message: 'Error al conectar a PostgreSQL', error: err.message });
     }
 });
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const { Pool } = require('pg');
-
 const pool = new Pool({
     user: process.env.POSTGRES_USER,
     host: process.env.POSTGRES_HOST,
@@ -35,9 +37,6 @@ const pool = new Pool({
     port: parseInt(process.env.POSTGRES_PORT || '5432'),
 });
 
-const app = express();
-app.use(cors());
-app.use(express.json());
 
 // Test SQL connection endpoint
 app.post('/api/connections/test-sql', async (req, res) => {
