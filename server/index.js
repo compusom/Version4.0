@@ -5,9 +5,17 @@ const { pool, testConnection } = require('./db');
 const app = express();
 const port = 3001; // Puerto para el backend
 
-// Configuración más específica de CORS
+// Configuración de CORS para permitir todas las URLs de Vite
 app.use(cors({
-    origin: 'http://192.168.1.234:5173', // URL del frontend
+    origin: [
+        'http://localhost:5173',
+        'http://192.168.1.234:5173',
+        'http://172.19.0.1:5173',
+        'http://172.22.0.1:5173',
+        'http://172.18.0.1:5173',
+        'http://172.20.0.1:5173',
+        'http://172.17.0.1:5173'
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
 }));
