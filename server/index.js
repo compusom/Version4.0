@@ -1,3 +1,27 @@
+const fs = require('fs');
+// Test SQL connection with custom credentials and optionally save them
+app.post('/api/connections/test-and-save', async (req, res) => {
+    const { host, database, user, password, port, save } = req.body;
+    const testPool = new Pool({
+        host,
+        database,
+        user,
+        password,
+        port: parseInt(port || '5432'),
+    });
+    try {
+        const client = await testPool.connect();
+        await client.query('SELECT NOW()');
+        client.release();
+        if (save) {
+            const envContent = `POSTGRES_HOST=${host}\nPOSTGRES_DB=${database}\nPOSTGRES_USER=${user}\nPOSTGRES_PASSWORD=${password}\nPOSTGRES_PORT=${port || 5432}\n`;
+            fs.writeFileSync(__dirname + '/.env', envContent);
+        }
+        res.json({ success: true, message: 'Conexión exitosa a PostgreSQL', saved: !!save });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Error al conectar a PostgreSQL', error: err.message });
+    }
+});
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');

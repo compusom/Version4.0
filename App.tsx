@@ -118,6 +118,7 @@ const App: React.FC = () => {
     // App State
     const [mainView, setMainView] = useState<AppView>('creative_analysis');
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [showSqlForm, setShowSqlForm] = useState<boolean>(false);
 
     // Data State
     const [clients, setClients] = useState<Client[]>([]);
@@ -157,6 +158,9 @@ const App: React.FC = () => {
                 setPerformanceData(initialData.performanceData || {});
                 
                 Logger.success(`Loaded initial data from backend.`);
+                if (!initialData.sqlConfig) {
+                    setShowSqlForm(true);
+                }
 
             } catch (error) {
                 const message = error instanceof Error ? error.message : 'Unknown server error';
@@ -267,7 +271,7 @@ const App: React.FC = () => {
 
     const renderMainContent = () => {
         if (isLoading) {
-             return (
+            return (
                 <div className="fixed inset-0 bg-brand-bg flex items-center justify-center z-50">
                     <div className="flex flex-col items-center gap-4">
                          <svg className="animate-spin h-10 w-10 text-brand-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -278,6 +282,10 @@ const App: React.FC = () => {
                     </div>
                 </div>
             )
+        }
+        if (showSqlForm) {
+            const SqlCredentialsForm = require('./components/SqlCredentialsForm').default;
+            return <SqlCredentialsForm onSuccess={() => setShowSqlForm(false)} />;
         }
         
         return (

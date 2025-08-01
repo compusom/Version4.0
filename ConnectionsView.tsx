@@ -76,12 +76,7 @@ export const ConnectionsView: React.FC<ConnectionsViewProps> = ({ metaApiConfig,
     // Test a connection by sending credentials to the backend
     const testConnection = async (type: 'sql' | 'ftp' | 'meta' | 'gemini', config?: any) => {
         try {
-            console.log('Intentando conexión con:', {type, config});
-            const baseUrl = window.location.hostname === 'localhost' 
-                ? 'http://localhost:3001' 
-                : `http://${window.location.hostname}:3001`;
-            
-            const response = await fetch(`${baseUrl}/api/connections/test-${type}`, {
+            const response = await fetch(`/api/connections/test-${type}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: config ? JSON.stringify(config) : undefined
@@ -125,21 +120,7 @@ export const ConnectionsView: React.FC<ConnectionsViewProps> = ({ metaApiConfig,
             // Step 1: Test the connection with the provided credentials
             addLog(`Attempting to test ${configType} connection...`, 'info');
             const testResult = await testConnection(typeLower, localConfig);
-            // Mostrar detalles técnicos si es SQL
-            if (configType === 'SQL' && testResult.details) {
-                addLog(
-                    `SUCCESS: Conexión SQL exitosa.\n` +
-                    `Mensaje: ${testResult.message}\n` +
-                    `Host: ${testResult.details.database.host}\n` +
-                    `Base: ${testResult.details.database.database}\n` +
-                    `Usuario: ${testResult.details.database.user}\n` +
-                    `Puerto: ${testResult.details.database.port}\n` +
-                    `Timestamp: ${JSON.stringify(testResult.details.timestamp)}`,
-                    'success'
-                );
-            } else {
-                addLog(`SUCCESS: ${configType} connection test successful. ${testResult.message}`, 'success');
-            }
+            addLog(`SUCCESS: ${configType} connection test successful. ${testResult.message}`, 'success');
 
             // Step 2: If test is successful, save the configuration
             addLog(`Saving ${configType} configuration...`, 'info');
@@ -152,20 +133,10 @@ export const ConnectionsView: React.FC<ConnectionsViewProps> = ({ metaApiConfig,
             else if (configType === 'SQL') setSqlConfig(localConfig as SqlConfig);
             else if (configType === 'FTP') setFtpConfig(localConfig as FtpConfig);
 
-        } catch (error: any) {
-            // Mostrar detalles completos del error si es SQL
-            if (configType === 'SQL' && error?.response) {
-                addLog(
-                    `ERROR: Falló la conexión SQL.\n` +
-                    `Mensaje: ${error.message}\n` +
-                    `Detalles: ${JSON.stringify(error.response)}`,
-                    'error'
-                );
-            } else {
-                const message = error instanceof Error ? error.message : "Error desconocido.";
-                addLog(`ERROR: ${message}`, "error");
-            }
-            Logger.error(`${configType} operation failed.`, { error });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Error desconocido.";
+            addLog(`ERROR: ${message}`, "error");
+            Logger.error(`${configType} operation failed.`, { error: message });
         }
     };
 

@@ -10,9 +10,7 @@ import { Client, PerformanceRecord, AllLookerData, BitacoraReport, UploadedVideo
 // 2. Exponer endpoints seguros (ej. GET /api/clients, POST /api/clients) para cada una de estas funciones.
 // 3. Implementar la lógica de negocio y las consultas a la base de datos.
 
-const API_BASE_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:3001/api'
-    : `http://${window.location.hostname}:3001/api`; // URL del servidor backend adaptativa
+const API_BASE_URL = '/api'; // Asume que la API está en el mismo dominio.
 
 // Función de utilidad para manejar las respuestas de la API
 const fetchApi = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
@@ -110,10 +108,6 @@ export const dbTyped = {
     // --- Control Panel ---
     // Backend: POST /api/control/clear-all-data -> no devuelve nada (204)
     clearAllData: () => api.post<void>('/control/clear-all-data', {}),
-
-    // --- SQL Tables Status ---
-    // Backend: POST /api/db/status -> devuelve estado de tablas principales
-    getSqlTablesStatus: () => api.post<{ success: boolean; tables: Array<{ table: string; exists: boolean; created: boolean; error: string | null }>; timestamp: string }>('/db/status', {}),
 };
 
 export const dbConnectionStatus = {
